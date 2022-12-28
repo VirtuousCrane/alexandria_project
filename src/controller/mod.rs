@@ -5,3 +5,4 @@ pub use test_endpoint::*;
 pub use isbn_endpoint::*;
 
 use super::common;
+use super::service;

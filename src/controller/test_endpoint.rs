@@ -15,7 +15,7 @@ pub fn hello(name: Option<String>) -> String {
 }
 
 #[get("/ip")]
-pub async fn get_ip() -> String {
+pub fn get_ip() -> String {
     let isbn_client = RequestClient::new();
-    isbn_client.ip().await
+    isbn_client.ip()
 }
