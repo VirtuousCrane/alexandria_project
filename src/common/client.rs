@@ -1,3 +1,5 @@
+use std::sync::{Mutex, Arc};
+
 use reqwest::{Client, Url};
 use rocket::FromFormField;
 use scraper::Html;
@@ -11,10 +13,11 @@ const THAI_ISBN_BASE_URL: &str = "https://e-service.nlt.go.th/ISBNReq/ListSearch
 
 pub struct RequestClient {
     reqwest_client: Client,
-    mode: Option<RequestMode>,
+    mode: Arc<Mutex<Option<RequestMode>>>,
 }
 
 #[derive(FromFormField)]
+#[derive(Clone)]
 pub enum RequestMode {
     #[field(value = "th")]
     #[field(value = "thai")]
@@ -38,13 +41,16 @@ impl RequestClient {
     pub fn new() -> Self {
         RequestClient {
             reqwest_client: Client::new(),
-            mode: None,
+            mode: Arc::new(Mutex::new(None)),
         }
     }
 
     /// Sets the request mode
-    pub fn set_mode(&mut self, mode: RequestMode) {
-        self.mode = Some(mode);
+    pub fn set_mode(&self, mode: Option<RequestMode>) {
+        let mode_clone = Arc::clone(&self.mode);
+        let mut mode_guard = mode_clone.lock()
+            .expect("Locked wrapped data");
+        *mode_guard = mode;
     }
 
     /// Sends a request
@@ -67,19 +73,21 @@ impl RequestClient {
     }
 
     /// Queries an ISBN
-    pub async fn query_isbn(&self, isbn: Isbn, mode: Option<RequestMode>) -> Book {
+    pub async fn query_isbn(&self, isbn: Isbn) -> Book {
         // Hyphenates ISBN
         let parsed_isbn = isbn
             .hyphenate()
             .unwrap();
 
         // Checks Request Mode
-        if mode.is_none() {
+        let mode_clone = Arc::clone(&self.mode);
+        let mode_obj = (*mode_clone.lock().unwrap()).clone();
+        if mode_obj.is_none() {
             unimplemented!("To implement Error handling");
         }
 
         //let mode = self.mode.as_ref().unwrap();
-        match mode.unwrap() {
+        match mode_obj.unwrap() {
             RequestMode::THAI_ISBN => {
                 // Sending the first request
                 let uri = Url::parse_with_params(
