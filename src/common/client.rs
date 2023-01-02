@@ -1,4 +1,4 @@
-use reqwest::{blocking::Client, Url};
+use reqwest::{Client, Url};
 use rocket::FromFormField;
 use scraper::Html;
 use isbn::Isbn;
@@ -29,6 +29,9 @@ pub enum RequestMode {
     OPEN_LIBRARY,
 }
 
+unsafe impl Send for RequestClient {}
+unsafe impl Sync for RequestClient {}
+
 impl RequestClient {
 
     /// Creates a new RequestClient
@@ -45,50 +48,51 @@ impl RequestClient {
     }
 
     /// Sends a request
-    fn send_request(&self, uri: Url) -> String {
+    pub async fn send_request(&self, uri: Url) -> String {
         let res = self.reqwest_client.get(uri)
             .send()
+            .await
             .expect("Error sending request");
         let content = res.text()
+            .await
             .expect("Failed to parse request to text");
 
         content
     }
 
     /// Sends a request to httpbin.org/ip
-    pub fn ip(&self) -> String {
+    pub async fn ip(&self) -> String {
         let uri = Url::parse("http://www.httpbin.org/ip").unwrap();
-        self.send_request(uri)
+        self.send_request(uri).await
     }
 
     /// Queries an ISBN
-    pub fn query_isbn(&self, isbn: Isbn) -> Book {
+    pub async fn query_isbn(&self, isbn: Isbn, mode: Option<RequestMode>) -> Book {
         // Hyphenates ISBN
         let parsed_isbn = isbn
             .hyphenate()
             .unwrap();
 
         // Checks Request Mode
-        if self.mode.is_none() {
+        if mode.is_none() {
             unimplemented!("To implement Error handling");
         }
 
-        let mode = self.mode.as_ref().unwrap();
-        match mode {
+        //let mode = self.mode.as_ref().unwrap();
+        match mode.unwrap() {
             RequestMode::THAI_ISBN => {
                 // Sending the first request
                 let uri = Url::parse_with_params(
                     THAI_ISBN_BASE_URL,
                     &[("Keyword", parsed_isbn.as_str())])
                     .expect("Failed to parse URL");
-                let mut document = self.send_request(uri);
+                let mut document = self.send_request(uri).await;
                 
                 // Getting the book info URL and send a new request
-                let html_doc = Html::parse_document(&document);
-                let book_info_url = thai_isbn::get_book_info_url(&html_doc);
-                document = self.send_request(book_info_url);
-                
-                // Parsing the Book struct
+                let book_info_url = thai_isbn::get_book_info_url(&document);
+                document = self.send_request(book_info_url).await;
+
+                // Parsing the Html document into a Book object
                 let html_doc = Html::parse_document(&document);
                 let book = thai_isbn::parse_document(&html_doc);
 

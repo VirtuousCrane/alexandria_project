@@ -8,7 +8,8 @@ use super::Book;
 const BOOK_ISBN_BASE_URL: &str = "https://e-service.nlt.go.th/ISBNReq/";
 
 // Given an HTML document from the Thai ISBN Database, return a URL of the book's info
-pub fn get_book_info_url(html_doc: &Html) -> Url {
+pub fn get_book_info_url(document: &str) -> Url {
+    let html_doc = Html::parse_document(document);
     let tr_selector = Selector::parse("tr").unwrap();
     let a_selector = Selector::parse("a").unwrap();
     let mut result = Url::parse(BOOK_ISBN_BASE_URL)
