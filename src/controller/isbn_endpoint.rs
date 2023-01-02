@@ -14,5 +14,8 @@ pub async fn isbn_handler(isbn: String, mode: Option<RequestMode>, isbn_client: 
     }
 
     // Tells the isbn request client to send a request and returns a JSON to the user
-    Json(isbn_client.query_isbn(parsed_isbn.unwrap(), mode).await)
+    if mode.is_some() {
+        isbn_client.set_mode(mode);
+    }
+    Json(isbn_client.query_isbn(parsed_isbn.unwrap()).await)
 }
